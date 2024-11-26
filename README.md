@@ -10,3 +10,22 @@
 ### Daaset
 -  FlatCam Dataset: https://computationalimaging.rice.edu/databases/flatcam-face-dataset/
   
+### Relevant Code
+- DeepFace: https://github.com/serengil/deepface
+
+
+### Training Codes
+
+```
+$ ...
+```
+
+### Test Codes
+
+```
+$ ...
+```
+
+### Sample FlatCam Raw Image
+
+![](img1.png)
