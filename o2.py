@@ -1,5 +1,5 @@
 import numpy as np
-
+import math
 import torch
 import torch.nn.functional as F
 
@@ -18,7 +18,7 @@ def fc2bayer(im):
     g = (gb + gr) / 2.0
     r = im[..., 1::2, 1::2]
 
-    Y = torch.concatenate((r, g, b), dim=1)
+    Y = torch.cat((r, g, b), dim=1)
 
     return Y
 
@@ -135,16 +135,8 @@ def visualize_dct_coefficients(YDCT64, YDCT32):
 #     
 #     return YmDCT
 
+"""
 def multiresolution_dct_subband(Y_bayer):
-    """
-    Computes multiresolution DCT subbands for a batch of images in PyTorch tensor format.
-    
-    Args:
-        Y_bayer (torch.Tensor): Input tensor of shape (B, C, H, W).
-    
-    Returns:
-        torch.Tensor: Concatenated subbands and resized DCT outputs.
-    """
     B, C, H, W = Y_bayer.shape
 
     # Step 2: Resize to (64, 64) and (32, 32)
@@ -176,7 +168,7 @@ def multiresolution_dct_subband(Y_bayer):
     YmDCT = torch.cat((X0, X1, X2, X3, YDCT32), dim=1)  # Concatenate along channel axis
 
     return YmDCT
-
+"""
 
 
 def plot_subbands(YmDCTs):
@@ -191,13 +183,68 @@ def plot_subbands(YmDCTs):
     B, C, H, W = YmDCTs.shape
 
     subbands_list = [YmDCTs[:, i*3:(i+1)*3, :, :] for i in range(5)]  # List of 5 subbands
-    subbands = torch.concatenate(subbands_list, dim=3)
+    subbands = torch.cat(subbands_list, dim=3)
 
     batch_list = [subbands[b, ...].unsqueeze(0) for b in range(B)]
 
-    image_grid = torch.concatenate(batch_list, dim=2).squeeze().permute(1,2,0).detach().cpu().numpy()
+    image_grid = torch.cat(batch_list, dim=2).squeeze().permute(1,2,0).detach().cpu().numpy()
     plt.imshow(image_grid)
     plt.show()
+
+
+def dct(x, norm='ortho'):
+    """
+    Compute DCT using PyTorch operations
+    Args:
+        x: input tensor of shape (B, C, H, W)
+        norm: normalization mode ('ortho' for orthogonal DCT)
+    """
+    x = x.float()
+    N = x.shape[-1]
+    k = torch.arange(N, dtype=x.dtype, device=x.device).reshape(1, 1, 1, N)
+    n = torch.arange(N, dtype=x.dtype, device=x.device).reshape(1, 1, N, 1)
+    
+    # Compute DCT coefficients
+    dct_mat = torch.cos(math.pi/(2*N) * k * (2*n + 1))
+    
+    # Apply DCT transform
+    X = torch.matmul(torch.matmul(dct_mat, x), dct_mat.transpose(-2, -1))
+    
+    if norm == 'ortho':
+        # Orthogonal normalization
+        X[:, :, 0, :] *= 1/math.sqrt(2)
+        X[:, :, :, 0] *= 1/math.sqrt(2)
+        X *= 2.0/N
+        
+    return X
+
+def multiresolution_dct_subband(Y_bayer):
+    """
+    Computes multiresolution DCT subbands for a batch of images using PyTorch.
+    Args:
+        Y_bayer (torch.Tensor): Input tensor of shape (B, C, H, W)
+    Returns:
+        torch.Tensor: Concatenated subbands and resized DCT outputs
+    """
+    # Step 2: Resize to (64, 64) and (32, 32)
+    Y64 = F.interpolate(Y_bayer, size=(64, 64), mode='area')
+    Y32 = F.interpolate(Y_bayer, size=(32, 32), mode='area')
+    
+    # Step 3: Compute DCT using PyTorch
+    YDCT64 = dct(Y64)
+    YDCT32 = dct(Y32)
+    
+    # Step 4: Decompose YDCT64 into subbands
+    h, w = YDCT64.shape[2], YDCT64.shape[3]
+    X0 = YDCT64[:, :, :h//2, :w//2]  # Top-left quadrant
+    X1 = YDCT64[:, :, :h//2, w//2:]  # Top-right quadrant
+    X2 = YDCT64[:, :, h//2:, :w//2]  # Bottom-left quadrant
+    X3 = YDCT64[:, :, h//2:, w//2:]  # Bottom-right quadrant
+    
+    # Step 5: Concatenate subbands and YDCT32
+    YmDCT = torch.cat((X0, X1, X2, X3, YDCT32), dim=1)
+    
+    return YmDCT
 
 
 if __name__ == "__main__":

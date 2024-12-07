@@ -12,6 +12,10 @@ from tqdm import tqdm
 import argparse
 from models.simple_classifier import SimpleClassifier
 import torch.nn as nn
+torch.backends.cudnn.benchmark = True  # Enable cuDNN auto-tuner
+torch.backends.cuda.matmul.allow_tf32 = True  # Enable TF32 for faster matrix operations
+
+
 
 from util import eval_accuracy
 
@@ -29,15 +33,14 @@ if __name__ == "__main__":
     # Initialize dataset and dataloader
     dataset = FlatCamFaceDataset(root_dir=args.root_dir)
     train_dataset = Subset(dataset, dataset.train_indices)
-    test_dataset = Subset(dataset, dataset.test_indices[:5])
+    test_dataset = Subset(dataset, dataset.test_indices)
 
     print("Number of All Samples:", len(dataset))
     print("Number of Training Samples:", len(train_dataset))
     print("Number of Test Samples:", len(test_dataset))
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
-
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, persistent_workers = True, shuffle=True)
+    test_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, persistent_workers = True, shuffle=True)
 
     # Initialize model, loss function, optimizer, and device
     model = SimpleClassifier()
@@ -89,7 +92,8 @@ if __name__ == "__main__":
 
         epoch_loss = running_loss / len(dataset)
         epoch_acc = 100.0 * correct / total
-        print(f"Epoch [{epoch+1}/{args.training_epochs}] - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
+        test_acc = eval_accuracy(model, test_loader)
+        print(f"Epoch [{epoch+1}/{args.training_epochs}] - Loss: {epoch_loss:.4f}, Train Acc: {epoch_acc:.2f}%, Test Acc: {test_acc:.2f}%")
 
     print("Training complete!")
 
