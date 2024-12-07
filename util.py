@@ -6,6 +6,7 @@ from scipy.fftpack import dctn
 import matplotlib.pyplot as plt
 from PIL import Image
 
+
 def parse_bayer(raw_image):
     """
     Parse a raw Bayer-pattern image into four sub-images: red, blue, and two greens.

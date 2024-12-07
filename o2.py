@@ -1,15 +1,25 @@
 import numpy as np
+
+import torch
+import torch.nn.functional as F
+
+from torchvision.utils import make_grid
+
 from scipy.fftpack import dctn
 import cv2
+
 import matplotlib.pyplot as plt
 
+
 def fc2bayer(im):
-    # Split up different color channels based on the BGGR Bayer pattern
-    b = im[0::2, 0::2]
-    gb = im[0::2, 1::2]
-    gr = im[1::2, 0::2]
-    r = im[1::2, 1::2]
-    Y = np.dstack([r, (gb + gr) / 2, b])
+    b = im[..., 0::2, 0::2]
+    gb = im[..., 0::2, 1::2]
+    gr = im[..., 1::2, 0::2]
+    g = (gb + gr) / 2.0
+    r = im[..., 1::2, 1::2]
+
+    Y = torch.concatenate((r, g, b), dim=1)
+
     return Y
 
 def visualize_bayer_channels(Y_bayer):
@@ -93,78 +103,109 @@ def visualize_dct_coefficients(YDCT64, YDCT32):
     plt.show()
 
 
-def multiresolution_dct_subband(Yraw):
-    # Step 1: Split Bayer pattern
-    Y_bayer = fc2bayer(Yraw)
+# def multiresolution_dct_subband(Y_bayer):
+#     # Step 2: Resize to 64x64x3 and 32x32x3
 
-    visualize_bayer_channels(Y_bayer)
-    
-    # Step 2: Resize to 64x64x3 and 32x32x3
-    Y64 = cv2.resize(Y_bayer, (64, 64), interpolation=cv2.INTER_AREA)
-    Y32 = cv2.resize(Y_bayer, (32, 32), interpolation=cv2.INTER_AREA)
-    
-    visualize_resized_images(Y64,Y32)
+#     import ipdb
+#     ipdb.set_trace()
+#     Y64 = cv2.resize(Y_bayer, (64, 64), interpolation=cv2.INTER_AREA)
+#     Y32 = cv2.resize(Y_bayer, (32, 32), interpolation=cv2.INTER_AREA)
+#     
+#     visualize_resized_images(Y64,Y32)
 
-    # Step 3: Compute DCT
-    YDCT64 = np.zeros_like(Y64)
-    YDCT32 = np.zeros_like(Y32)
-    for c in range(3):
-        YDCT64[:, :, c] = dctn(Y64[:, :, c], norm='ortho')
-        YDCT32[:, :, c] = dctn(Y32[:, :, c], norm='ortho')
+#     # Step 3: Compute DCT
+#     YDCT64 = np.zeros_like(Y64)
+#     YDCT32 = np.zeros_like(Y32)
+#     for c in range(3):
+#         YDCT64[:, :, c] = dctn(Y64[:, :, c], norm='ortho')
+#         YDCT32[:, :, c] = dctn(Y32[:, :, c], norm='ortho')
 
-    visualize_dct_coefficients(YDCT64,YDCT32)
+#     visualize_dct_coefficients(YDCT64,YDCT32)
+#     
+#     # Step 4: Decompose YDCT64 into subbands
+#     h, w, _ = YDCT64.shape
+#     X0 = YDCT64[:h//2, :w//2, :]  # Top-left quadrant
+#     X1 = YDCT64[:h//2, w//2:, :]  # Top-right quadrant
+#     X2 = YDCT64[h//2:, :w//2, :]  # Bottom-left quadrant
+#     X3 = YDCT64[h//2:, w//2:, :]  # Bottom-right quadrant
+#     
+#     # Step 5: Concatenate subbands and YDCT32
+#     YmDCT = np.concatenate((X0, X1, X2, X3, YDCT32), axis=2)
+#     # YmDCT will have shape (32, 32, 15)
+#     
+#     return YmDCT
+
+def multiresolution_dct_subband(Y_bayer):
+    """
+    Computes multiresolution DCT subbands for a batch of images in PyTorch tensor format.
     
+    Args:
+        Y_bayer (torch.Tensor): Input tensor of shape (B, C, H, W).
+    
+    Returns:
+        torch.Tensor: Concatenated subbands and resized DCT outputs.
+    """
+    B, C, H, W = Y_bayer.shape
+
+    # Step 2: Resize to (64, 64) and (32, 32)
+    Y64 = F.interpolate(Y_bayer, size=(64, 64), mode='area')  # Resize to 64x64
+    Y32 = F.interpolate(Y_bayer, size=(32, 32), mode='area')  # Resize to 32x32
+
+    # Step 3: Compute DCT using dctn
+    def compute_dct(Y):
+        B, C, H, W = Y.shape
+        Y_dct = torch.empty_like(Y)  # Placeholder tensor for the DCT
+        for b in range(B):
+            for c in range(C):
+                # Apply dctn to each channel of each batch
+                dct_result = dctn(Y[b, c].cpu().numpy(), norm='ortho')  # dctn works on NumPy arrays
+                Y_dct[b, c] = torch.from_numpy(dct_result)  # Convert back to PyTorch
+        return Y_dct
+
+    YDCT64 = compute_dct(Y64)
+    YDCT32 = compute_dct(Y32)
+
     # Step 4: Decompose YDCT64 into subbands
-    h, w, _ = YDCT64.shape
-    X0 = YDCT64[:h//2, :w//2, :]  # Top-left quadrant
-    X1 = YDCT64[:h//2, w//2:, :]  # Top-right quadrant
-    X2 = YDCT64[h//2:, :w//2, :]  # Bottom-left quadrant
-    X3 = YDCT64[h//2:, w//2:, :]  # Bottom-right quadrant
-    
+    h, w = YDCT64.shape[2], YDCT64.shape[3]
+    X0 = YDCT64[:, :, :h//2, :w//2]  # Top-left quadrant
+    X1 = YDCT64[:, :, :h//2, w//2:]  # Top-right quadrant
+    X2 = YDCT64[:, :, h//2:, :w//2]  # Bottom-left quadrant
+    X3 = YDCT64[:, :, h//2:, w//2:]  # Bottom-right quadrant
+
     # Step 5: Concatenate subbands and YDCT32
-    YmDCT = np.concatenate((X0, X1, X2, X3, YDCT32), axis=2)
-    # YmDCT will have shape (32, 32, 15)
-    
+    YmDCT = torch.cat((X0, X1, X2, X3, YDCT32), dim=1)  # Concatenate along channel axis
+
     return YmDCT
 
 
 
-def plot_subbands(YmDCT):
+def plot_subbands(YmDCTs):
     """
-    Plots the 5 subbands in YmDCT and saves the figure.
+    Plots the B X 5 subbands in YmDCTs and saves the figure.
 
     Args:
-        YmDCT (numpy.ndarray): Multi-resolution DCT subband representation of size (32, 32, 15).
+        YmDCT (numpy.ndarray): Multi-resolution DCT subband representation of size (B, 15, 32, 32).
     """
     # Extract the subbands
-    subbands = [YmDCT[:, :, i*3:(i+1)*3] for i in range(5)]  # List of 5 subbands
 
-    # Prepare the figure
-    fig, axes = plt.subplots(1, 5, figsize=(20, 4))  # 1 row, 5 columns
+    B, C, H, W = YmDCTs.shape
 
-    for idx, (ax, subband) in enumerate(zip(axes, subbands)):
-        # Process subband for visualization
-        # Take absolute value and normalize
-        subband_abs = np.abs(subband)
-        subband_norm = subband_abs / (np.max(subband_abs) + 1e-8)  # Avoid division by zero
+    subbands_list = [YmDCTs[:, i*3:(i+1)*3, :, :] for i in range(5)]  # List of 5 subbands
+    subbands = torch.concatenate(subbands_list, dim=3)
 
-        # Optional: Enhance visibility using logarithmic scaling
-        # subband_norm = np.log1p(subband_abs)
-        # subband_norm /= np.max(subband_norm)
+    batch_list = [subbands[b, ...].unsqueeze(0) for b in range(B)]
 
-        # Clip values to [0, 1] for display
-        subband_norm = np.clip(subband_norm, 0, 1)
-
-        # Display the image
-        ax.imshow(subband_norm)
-        ax.axis('off')
-        ax.set_title(f'Subband {idx+1}')
-
-    plt.tight_layout()
+    image_grid = torch.concatenate(batch_list, dim=2).squeeze().permute(1,2,0).detach().cpu().numpy()
+    plt.imshow(image_grid)
     plt.show()
+
 
 if __name__ == "__main__":
 
-    Yraw = cv2.imread('fc_captures/fc_captures/01/010.png', cv2.IMREAD_GRAYSCALE)
+    Yraw = cv2.imread('../fc_captures/01/010.png', cv2.IMREAD_GRAYSCALE)
+
+    Y_bayer = fc2bayer(Yraw)
+    # visualize_bayer_channels(Y_bayer) 
+
     YmDCT = multiresolution_dct_subband(Yraw)
     plot_subbands(YmDCT)

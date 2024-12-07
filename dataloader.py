@@ -48,12 +48,17 @@ class FlatCamFaceDataset(Dataset):
         label = self.labels[idx]
         
         # Load image and convert to RGB
-        image = Image.open(image_path).convert('RGB')
+        image = Image.open(image_path)
         transform = transforms.ToTensor()
+
+
         image = transform(image)
+        # print(f"Index {idx}: ", image_path)
+        # print("\t", image.min(), image.max())
 
-
-
-
+        image =  0.5*(image / 32768.0) + 0.5
+        # print("\t", image.min(), image.max())
+        image = image.clip(min=0.0, max=1.0)
+        # print("\t", image.min(), image.max())
         
         return image, label
