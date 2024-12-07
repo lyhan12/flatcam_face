@@ -1,4 +1,3 @@
-
 import torch
 import numpy as np
 from scipy.fftpack import dctn
@@ -6,29 +5,17 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms as transforms
 from torchvision.utils import make_grid
-
-
 from torch.utils.data import Dataset, DataLoader
 from dataloader import FlatCamFaceDataset
-
 from o2 import fc2bayer, multiresolution_dct_subband, plot_subbands
-# from util import get_multires_subband_dct_images, parse_bayer
-
 from tqdm import tqdm
-
 import argparse
-
 from models.simple_classifier import SimpleClassifier
 import torch.nn as nn
 
-
-
-
 # Example usage
 if __name__ == "__main__":
-
-    print("adf")
-
+    print("Starting training...")
 
     parser = argparse.ArgumentParser(description="FlatCamFaceDataset DataLoader Example")
     parser.add_argument('--root_dir', type=str, required=True, help="Path to the dataset root directory")
@@ -37,16 +24,16 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', type=float, default=1e-3, help="Learning rate for the optimizer")
     args = parser.parse_args()
 
-
     # Initialize dataset and dataloader
     dataset = FlatCamFaceDataset(root_dir=args.root_dir)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
+    # Initialize model, loss function, optimizer, and device
     model = SimpleClassifier()
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(),lr = args.learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    model = model.to(device)
     model.train()
 
     for epoch in range(args.training_epochs):
@@ -58,11 +45,13 @@ if __name__ == "__main__":
         epoch_iterator = tqdm(dataloader, desc=f"Epoch {epoch+1}/{args.training_epochs}", unit="batch")
 
         for Ys_raw, labels in epoch_iterator:
+            # Move data to the same device as the model
             Ys_raw, labels = Ys_raw.to(device), labels.to(device)
-            # Convert raw images to Bayer pattern
-            Ys = fc2bayer(Ys_raw)
-            YmDCTs = multiresolution_dct_subband(Ys)
             
+            # Convert raw images to Bayer pattern and apply transformations on GPU
+            Ys = fc2bayer(Ys_raw.to(device))
+            YmDCTs = multiresolution_dct_subband(Ys).to(device)
+
             # Forward pass
             outputs = model(YmDCTs)
             loss = criterion(outputs, labels)
@@ -84,36 +73,3 @@ if __name__ == "__main__":
         print(f"Epoch [{epoch+1}/{args.training_epochs}] - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
 
     print("Training complete!")
-
-    """
-    # Example: Sample and print a single batch
-    with tqdm(total=args.training_epochs, desc="Training Progress") as pbar:
-        for iter, (Ys_raw, labels) in enumerate(dataloader):
-            if iter == args.training_epochs:
-                break
-
-            # print(f"Batch {iter+1}:")
-            # print(f"Raw Images: {Ys_raw.shape}")  # (batch_size, 3, 64, 64)
-            # print(f"Labels: {labels}")       # Tensor of labels
-
-
-
-            Ys = fc2bayer(Ys_raw)
-
-
-
-            YmDCTs = multiresolution_dct_subband(Ys)
-
-
-            if False: # Visualization
-                raw_image_grid = make_grid(Ys_raw, nrow=4, padding=0)
-                # plt.imshow(raw_image_grid.detach().permute(1,2,0).cpu().numpy())
-                # plt.show()
-                color_image_grid = make_grid(Ys, nrow=4, padding=0)
-                plt.imshow(color_image_grid.detach().permute(1,2,0).cpu().numpy())
-                plt.show()
-
-                plot_subbands(YmDCTs)
-
-            pbar.update(1)
-    """
