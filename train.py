@@ -40,7 +40,7 @@ if __name__ == "__main__":
     print("Number of Test Samples:", len(test_dataset))
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, persistent_workers = True, shuffle=True)
-    test_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, persistent_workers = True, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True, persistent_workers = True, shuffle=True)
 
     # Initialize model, loss function, optimizer, and device
     model = SimpleClassifier()
@@ -54,11 +54,9 @@ if __name__ == "__main__":
     test_acc = eval_accuracy(model, test_loader)
     print("Test Accuracy:", test_acc)
 
-    import ipdb
-    ipdb.set_trace()
-
 
     for epoch in range(args.training_epochs):
+        model.train()
         running_loss = 0.0
         total = 0
         correct = 0
@@ -94,7 +92,7 @@ if __name__ == "__main__":
         epoch_acc = 100.0 * correct / total
         test_acc = eval_accuracy(model, test_loader)
         print(f"Epoch [{epoch+1}/{args.training_epochs}] - Loss: {epoch_loss:.4f}, Train Acc: {epoch_acc:.2f}%, Test Acc: {test_acc:.2f}%")
-
+    
     print("Training complete!")
 
 

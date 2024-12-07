@@ -18,6 +18,7 @@ def eval_accuracy(model, test_loader, device=None):
     correct = 0
 
     progress_bar = tqdm(test_loader, desc=f"Evaluating Test Accuracy")
+    model.eval()
     with torch.no_grad():
         for Ys_raw, labels in progress_bar:
             Ys_raw, labels = Ys_raw.to(device), labels.to(device)
@@ -32,7 +33,7 @@ def eval_accuracy(model, test_loader, device=None):
 
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-
+    
 
     acc = 100.0 * correct / total
     return acc
