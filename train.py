@@ -8,7 +8,6 @@ import torchvision.transforms as transforms
 from torchvision.utils import make_grid
 
 
-
 from torch.utils.data import Dataset, DataLoader
 from dataloader import FlatCamFaceDataset
 
@@ -20,6 +19,7 @@ from tqdm import tqdm
 import argparse
 
 from models.simple_classifier import SimpleClassifier
+import torch.nn as nn
 
 
 
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FlatCamFaceDataset DataLoader Example")
     parser.add_argument('--root_dir', type=str, required=True, help="Path to the dataset root directory")
     parser.add_argument('--batch_size', type=int, default=8, help="Batch size for DataLoader")
-    parser.add_argument('--training_epochs', type=int, default=10, help="Training epochs for training")
-
+    parser.add_argument('--training_epochs', type=int, default=1, help="Training epochs for training")
+    parser.add_argument('--learning_rate', type=float, default=1e-3, help="Learning rate for the optimizer")
     args = parser.parse_args()
 
 
@@ -43,8 +43,49 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
     model = SimpleClassifier()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(),lr = args.learning_rate)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    model.train()
 
+    for epoch in range(args.training_epochs):
+        running_loss = 0.0
+        total = 0
+        correct = 0
+
+        # Create a progress bar for this epoch
+        epoch_iterator = tqdm(dataloader, desc=f"Epoch {epoch+1}/{args.training_epochs}", unit="batch")
+
+        for Ys_raw, labels in epoch_iterator:
+            Ys_raw, labels = Ys_raw.to(device), labels.to(device)
+            # Convert raw images to Bayer pattern
+            Ys = fc2bayer(Ys_raw)
+            YmDCTs = multiresolution_dct_subband(Ys)
+            
+            # Forward pass
+            outputs = model(YmDCTs)
+            loss = criterion(outputs, labels)
+
+            # Backward and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item() * YmDCTs.size(0)
+
+            # Compute accuracy
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+        epoch_loss = running_loss / len(dataset)
+        epoch_acc = 100.0 * correct / total
+        print(f"Epoch [{epoch+1}/{args.training_epochs}] - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
+
+    print("Training complete!")
+
+    """
     # Example: Sample and print a single batch
     with tqdm(total=args.training_epochs, desc="Training Progress") as pbar:
         for iter, (Ys_raw, labels) in enumerate(dataloader):
@@ -75,4 +116,4 @@ if __name__ == "__main__":
                 plot_subbands(YmDCTs)
 
             pbar.update(1)
-
+    """
