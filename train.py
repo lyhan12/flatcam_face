@@ -5,13 +5,15 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms as transforms
 from torchvision.utils import make_grid
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 from dataloader import FlatCamFaceDataset
 from o2 import fc2bayer, multiresolution_dct_subband, plot_subbands
 from tqdm import tqdm
 import argparse
 from models.simple_classifier import SimpleClassifier
 import torch.nn as nn
+
+from util import eval_accuracy
 
 # Example usage
 if __name__ == "__main__":
@@ -26,7 +28,16 @@ if __name__ == "__main__":
 
     # Initialize dataset and dataloader
     dataset = FlatCamFaceDataset(root_dir=args.root_dir)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    train_dataset = Subset(dataset, dataset.train_indices)
+    test_dataset = Subset(dataset, dataset.test_indices[:5])
+
+    print("Number of All Samples:", len(dataset))
+    print("Number of Training Samples:", len(train_dataset))
+    print("Number of Test Samples:", len(test_dataset))
+
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
+
 
     # Initialize model, loss function, optimizer, and device
     model = SimpleClassifier()
@@ -36,13 +47,21 @@ if __name__ == "__main__":
     model = model.to(device)
     model.train()
 
+
+    test_acc = eval_accuracy(model, test_loader)
+    print("Test Accuracy:", test_acc)
+
+    import ipdb
+    ipdb.set_trace()
+
+
     for epoch in range(args.training_epochs):
         running_loss = 0.0
         total = 0
         correct = 0
 
         # Create a progress bar for this epoch
-        epoch_iterator = tqdm(dataloader, desc=f"Epoch {epoch+1}/{args.training_epochs}", unit="batch")
+        epoch_iterator = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.training_epochs}", unit="batch")
 
         for Ys_raw, labels in epoch_iterator:
             # Move data to the same device as the model
@@ -73,3 +92,8 @@ if __name__ == "__main__":
         print(f"Epoch [{epoch+1}/{args.training_epochs}] - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
 
     print("Training complete!")
+
+
+
+
+        

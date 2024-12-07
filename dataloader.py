@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
+
 import os
 
 
@@ -22,6 +23,9 @@ class FlatCamFaceDataset(Dataset):
         self.root_dir = root_dir
         self.image_paths = []
         self.labels = []
+
+        train_indices = []
+        test_indices = []
         
         # Populate the image paths and labels
         for label, class_dir in enumerate(sorted(os.listdir(root_dir))):
@@ -29,8 +33,18 @@ class FlatCamFaceDataset(Dataset):
             if os.path.isdir(class_path):
                 for image_name in os.listdir(class_path):
                     image_path = os.path.join(class_path, image_name)
+
+                    img_idx = int(os.path.basename(image_path).split(".")[0])
+                    if img_idx % 10 == 1:
+                        test_indices.append(len(self.image_paths))
+                    else:
+                        train_indices.append(len(self.image_paths))
+
                     self.image_paths.append(image_path)
                     self.labels.append(label)
+
+        self.train_indices = torch.tensor(train_indices)
+        self.test_indices = torch.tensor(test_indices)
 
         
     def __len__(self):
