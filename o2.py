@@ -18,7 +18,7 @@ def fc2bayer(im):
     g = (gb + gr) / 2.0
     r = im[..., 1::2, 1::2]
 
-    Y = torch.concatenate((r, g, b), dim=1)
+    Y = torch.cat((r, g, b), dim=1)
 
     return Y
 
@@ -191,11 +191,11 @@ def plot_subbands(YmDCTs):
     B, C, H, W = YmDCTs.shape
 
     subbands_list = [YmDCTs[:, i*3:(i+1)*3, :, :] for i in range(5)]  # List of 5 subbands
-    subbands = torch.concatenate(subbands_list, dim=3)
+    subbands = torch.cat(subbands_list, dim=3)
 
     batch_list = [subbands[b, ...].unsqueeze(0) for b in range(B)]
 
-    image_grid = torch.concatenate(batch_list, dim=2).squeeze().permute(1,2,0).detach().cpu().numpy()
+    image_grid = torch.cat(batch_list, dim=2).squeeze().permute(1,2,0).detach().cpu().numpy()
     plt.imshow(image_grid)
     plt.show()
 

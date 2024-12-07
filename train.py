@@ -12,6 +12,10 @@ from tqdm import tqdm
 import argparse
 from models.simple_classifier import SimpleClassifier
 import torch.nn as nn
+torch.backends.cudnn.benchmark = True  # Enable cuDNN auto-tuner
+torch.backends.cuda.matmul.allow_tf32 = True  # Enable TF32 for faster matrix operations
+
+
 
 # Example usage
 if __name__ == "__main__":
@@ -26,7 +30,7 @@ if __name__ == "__main__":
 
     # Initialize dataset and dataloader
     dataset = FlatCamFaceDataset(root_dir=args.root_dir)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    dataloader = DataLoader(dataset,batch_size=args.batch_size, num_workers=8, pin_memory=True,persistent_workers = True,shuffle=True)
 
     # Initialize model, loss function, optimizer, and device
     model = SimpleClassifier()
