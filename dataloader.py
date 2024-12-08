@@ -67,12 +67,12 @@ class FlatCamFaceDataset(Dataset):
 
 
         image = transform(image)
-        # print(f"Index {idx}: ", image_path)
-        # print("\t", image.min(), image.max())
+        print(f"Index {idx}: ", image_path)
+        print("before normalization\t", image.min(), image.max())
 
         image =  0.5*(image / 32768.0) + 0.5
-        # print("\t", image.min(), image.max())
-        image = image.clip(min=0.0, max=1.0)
-        # print("\t", image.min(), image.max())
+        print("after normalization", image.min(), image.max())
+        #image = image.clip(min=0.0, max=1.0)
+        #print("after clip", image.min(), image.max())
         
         return image, label
