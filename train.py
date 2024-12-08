@@ -6,13 +6,18 @@ from PIL import Image
 import torchvision.transforms as transforms
 from torchvision.utils import make_grid
 from torch.utils.data import Dataset, DataLoader, Subset
+
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ExponentialLR
 from dataloader import FlatCamFaceDataset, FlatCamFaceDCTDataset
 from o2 import fc2bayer, multiresolution_dct_subband, plot_subbands
 from tqdm import tqdm
 import argparse
 from models.simple_classifier import SimpleClassifier
 from models.vgg_classifier import VGGClassifier
+
 from models.vgg import VGG_ATT
+# from models.vit import ViTClassifier
+from models.swin import SwinClassifier
 import torch.nn as nn
 torch.backends.cudnn.benchmark = True  # Enable cuDNN auto-tuner
 torch.backends.cuda.matmul.allow_tf32 = True  # Enable TF32 for faster matrix operations
@@ -36,7 +41,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="FlatCamFaceDataset DataLoader Example")
     parser.add_argument('--root_dir', type=str, required=True, help="Path to the dataset root directory")
-    parser.add_argument('--batch_size', type=int, default=128, help="Batch size for DataLoader")
+    parser.add_argument('--batch_size', type=int, default=256, help="Batch size for DataLoader")
     parser.add_argument('--training_epochs', type=int, default=100, help="Training epochs for training")
     parser.add_argument('--learning_rate', type=float, default=1e-4, help="Learning rate for the optimizer")
     args = parser.parse_args()
@@ -59,11 +64,17 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # model = SimpleClassifier()
     # model = VGGClassifier(num_classes=87).to(device)
-    model = VGG_ATT(num_classes=87).to(device)
+    # model = VGG_ATT(num_classes=87).to(device)
+    # model = ViTClassifier(num_classes=87).to(device)
+    model = SwinClassifier(num_classes=87, in_channels=15).to(device)
+
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    model = model.to(device)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
+    # scheduler = StepLR(optimizer, 30)
+    # scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+    scheduler = ExponentialLR(optimizer, gamma=0.95)
 
     for epoch in range(epochs):
         model.train()
@@ -110,6 +121,8 @@ if __name__ == "__main__":
 
         val_loss /= len(val_loader.dataset)
         val_acc = correct / total
+
+        scheduler.step()
         print(f"Epoch {epoch+1}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")    
 
     print("Training complete!")

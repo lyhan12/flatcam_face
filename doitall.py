@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
+from models.vgg import VGG_ATT
+
 class FlatCamDataset(Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
@@ -69,11 +71,11 @@ class VGGClassifier(nn.Module):
         return self.model(x)
 
 if __name__ == "__main__":
-    root_dir = "fc_captures"
+    root_dir = "../fc_captures_copy"
     train_loader, val_loader = create_dataloaders(root_dir, batch_size=256)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = VGGClassifier(num_classes=87).to(device)
+    model = VGG_ATT(num_classes=87).to(device)
     
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-4)

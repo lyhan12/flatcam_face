@@ -3,15 +3,15 @@ import torch.nn as nn
 from torchvision.models.swin_transformer import SwinTransformer
 
 class SwinClassifier(nn.Module):
-    def __init__(self, num_classes=88, in_channels=15):
+    def __init__(self, num_classes=87, in_channels=15):
         super(SwinClassifier, self).__init__()
         # Create a Swin Transformer with the desired number of classes
         # This configuration is similar to Swin-T. Adjust if needed.
         self.swin = SwinTransformer(
             patch_size=[4, 4],
-            embed_dim=96,
-            depths=[2, 2, 6, 2],
-            num_heads=[3, 6, 12, 24],
+            embed_dim=128,
+            depths=[4, 4, 3, 3],
+            num_heads=[4, 8, 16, 32],
             window_size=[7, 7],
             stochastic_depth_prob=0.1,
             num_classes=num_classes,
@@ -42,7 +42,7 @@ class SwinClassifier(nn.Module):
 
     def forward(self, x):
         # x shape: (B, 15, H, W)
-        # The model will output (B, 88)
+        # The model will output (B, 87)
         return self.swin(x)
 
 
