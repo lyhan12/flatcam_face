@@ -1,4 +1,3 @@
-'''VGG11/13/16/19 in Pytorch.'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,15 +8,19 @@ cfg = {
     'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
     'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
-    'VGG_ATT': [64, 64, 128, 128, 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M', 512, 'M', 512, 'M'],
+    'VGG_ATT': [64, 64, 128, 128, 256, 256, 256, 'M', 
+                512, 512, 512, 'M', 
+                512, 512, 512, 'M', 
+                512, 'M', 
+                512, 'M'],
 }
 
 
 class VGG(nn.Module):
-    def __init__(self, vgg_name):
+    def __init__(self, vgg_name, num_classes=88):
         super(VGG, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512, 88)
+        self.classifier = nn.Linear(512, num_classes)
 
     def forward(self, x):
         out = self.features(x)
@@ -41,13 +44,16 @@ class VGG(nn.Module):
 
 
 class VGG_ATT(nn.Module):
-    def __init__(self, mode='pc'):
+    def __init__(self, mode='pc', num_classes=88):
         super(VGG_ATT, self).__init__()
         self.mode = mode
 
         self.features = self._make_layers(cfg['VGG_ATT'])
-        self.classifier = nn.Linear(512, 88)
+        # Adjust final classification layer to num_classes
+        self.classifier = nn.Linear(512, num_classes)
 
+        # Splitting the feature extractor into chunks
+        # The indexing is based on the original configuration of layers
         self.l1 = nn.Sequential(*list(self.features)[:22])
         self.l2 = nn.Sequential(*list(self.features)[22:32])
         self.l3 = nn.Sequential(*list(self.features)[32:42])
@@ -64,7 +70,8 @@ class VGG_ATT(nn.Module):
         self.fc1_l2 = nn.Linear(512, 512)
         self.fc1_l3 = nn.Linear(512, 512)
 
-        self.fc2 = nn.Linear(256 + 512 + 512, 88)
+        # Adjust final fc2 layer to num_classes
+        self.fc2 = nn.Linear(256 + 512 + 512, num_classes)
 
     def forward(self, x):
         l1 = self.l1(x)
@@ -108,14 +115,12 @@ class VGG_ATT(nn.Module):
         if self.mode == 'dp':
             att = l * g.unsqueeze(2).unsqueeze(3)
             att = att.sum(1).unsqueeze(1)
-
             size = att.size()
             att = att.view(att.size(0), att.size(1), -1)
             att = F.softmax(att, dim=2)
             att = att.view(size)
         elif self.mode == 'pc':
             att = l + g.unsqueeze(2).unsqueeze(3)
-
             if level == 1:
                 u = self.u1
             elif level == 2:
@@ -123,15 +128,12 @@ class VGG_ATT(nn.Module):
             elif level == 3:
                 u = self.u3
             att = u(att)
-
             size = att.size()
             att = att.view(att.size(0), att.size(1), -1)
             att = F.softmax(att, dim=2)
             att = att.view(size)
-
         return att
 
     def _weighted_combine(self, l, att_map):
         g = l * att_map
-
         return g.view(g.size(0), g.size(1), -1).sum(2)
