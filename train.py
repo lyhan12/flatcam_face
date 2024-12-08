@@ -12,6 +12,7 @@ from tqdm import tqdm
 import argparse
 from models.simple_classifier import SimpleClassifier
 from models.vgg_classifier import VGGClassifier
+from models.vgg import VGG_ATT
 import torch.nn as nn
 torch.backends.cudnn.benchmark = True  # Enable cuDNN auto-tuner
 torch.backends.cuda.matmul.allow_tf32 = True  # Enable TF32 for faster matrix operations
@@ -57,7 +58,8 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # model = SimpleClassifier()
-    model = VGGClassifier(num_classes=87).to(device)
+    # model = VGGClassifier(num_classes=87).to(device)
+    model = VGG_ATT(num_classes=87).to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
