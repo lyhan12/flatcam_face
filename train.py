@@ -16,7 +16,7 @@ from models.simple_classifier import SimpleClassifier
 from models.vgg_classifier import VGGClassifier
 
 from models.vgg import VGG_ATT
-# from models.vit import ViTClassifier
+from models.vit import ViTClassifier
 from models.swin import SwinClassifier
 import torch.nn as nn
 torch.backends.cudnn.benchmark = True  # Enable cuDNN auto-tuner

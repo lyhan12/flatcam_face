@@ -8,14 +8,24 @@ class SwinClassifier(nn.Module):
         # Create a Swin Transformer with the desired number of classes
         # This configuration is similar to Swin-T. Adjust if needed.
         self.swin = SwinTransformer(
-            patch_size=[4, 4],
-            embed_dim=128,
+            patch_size=[8, 8],
+            embed_dim=256,
             depths=[4, 4, 3, 3],
             num_heads=[4, 8, 16, 32],
-            window_size=[7, 7],
+            window_size=[8, 8],
             stochastic_depth_prob=0.1,
             num_classes=num_classes,
         )
+        # self.swin = SwinTransformer(
+        #     patch_size=[8, 8],
+        #     embed_dim=256,
+        #     depths=[2, 6, 2],
+        #     num_heads=[4, 8, 16],
+        #     window_size=[8, 8],
+        #     stochastic_depth_prob=0.1,
+        #     num_classes=num_classes,
+        # )
+
 
         # The first layer of self.swin.features is a Sequential containing:
         # [Conv2d(in=3, out=embed_dim), Permute, LayerNorm].
@@ -25,7 +35,7 @@ class SwinClassifier(nn.Module):
         out_channels, _, kh, kw = old_weight.shape
 
         # Create a new Conv2d layer with the desired input channels
-        new_conv = nn.Conv2d(in_channels, out_channels, kernel_size=(4, 4), stride=(4, 4))
+        new_conv = nn.Conv2d(in_channels, out_channels, kernel_size=(8, 8), stride=(8, 8))
         
         # Copy the original weights for the first 3 channels
         with torch.no_grad():
