@@ -4,6 +4,10 @@ from torchvision import transforms
 from PIL import Image
 
 import os
+import glob
+import numpy as np
+
+from tqdm import tqdm
 
 
 class FlatCamFaceDataset(Dataset):
@@ -28,20 +32,23 @@ class FlatCamFaceDataset(Dataset):
         test_indices = []
         
         # Populate the image paths and labels
-        for label, class_dir in enumerate(sorted(os.listdir(root_dir))):
-            class_path = os.path.join(root_dir, class_dir)
-            if os.path.isdir(class_path):
-                for image_name in os.listdir(class_path):
-                    image_path = os.path.join(class_path, image_name)
 
-                    img_idx = int(os.path.basename(image_path).split(".")[0])
-                    if img_idx % 10 == 1:
-                        test_indices.append(len(self.image_paths))
-                    else:
-                        train_indices.append(len(self.image_paths))
+        with tqdm(total=len(os.listdir(root_dir)), desc=f"Loading Data in {root_dir}") as pbar:
+            for label, class_dir in enumerate(sorted(os.listdir(root_dir))):
+                class_path = os.path.join(root_dir, class_dir)
+                if os.path.isdir(class_path):
+                    for image_name in os.listdir(class_path):
+                        image_path = os.path.join(class_path, image_name)
 
-                    self.image_paths.append(image_path)
-                    self.labels.append(label)
+                        img_idx = int(os.path.basename(image_path).split(".")[0])
+                        if img_idx % 10 == 1:
+                            test_indices.append(len(self.image_paths))
+                        else:
+                            train_indices.append(len(self.image_paths))
+
+                        self.image_paths.append(image_path)
+                        self.labels.append(label)
+                pbar.update(1)
 
         self.train_indices = torch.tensor(train_indices)
         self.test_indices = torch.tensor(test_indices)
@@ -76,3 +83,36 @@ class FlatCamFaceDataset(Dataset):
         # print("\t", image.min(), image.max())
         
         return image, label
+
+class FlatCamFaceDCTDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        
+        self.class_names = sorted([d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))])
+        self.class_to_idx = {cls_name: i for i, cls_name in enumerate(self.class_names)}
+        
+        self.samples = []
+
+        with tqdm(total=len(os.listdir(root_dir)), desc=f"Loading Data in {root_dir}") as pbar:
+            for cls_name in self.class_names:
+                class_path = os.path.join(root_dir, cls_name)
+                npy_files = glob.glob(os.path.join(class_path, '*.npy'))
+                for f in npy_files:
+                    img = np.load(f)  # Shape: (32, 32, 15)
+                    img = np.transpose(img, (2, 0, 1))  # (C, H, W)
+                    img = torch.from_numpy(img).float() / 255.0
+
+                    self.samples.append((img, self.class_to_idx[cls_name]))
+                pbar.update(1)
+
+                
+    def __len__(self):
+        return len(self.samples)
+    
+    def __getitem__(self, idx):
+        img, label = self.samples[idx]
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
