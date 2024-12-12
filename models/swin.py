@@ -12,7 +12,7 @@ class SwinClassifier(nn.Module):
             embed_dim=256,
             depths=[4, 4, 3, 3],
             num_heads=[4, 8, 16, 32],
-            window_size=[8, 8],
+            window_size=[10, 10],
             stochastic_depth_prob=0.1,
             num_classes=num_classes,
         )

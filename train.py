@@ -16,7 +16,7 @@ from models.simple_classifier import SimpleClassifier
 from models.vgg_classifier import VGGClassifier
 
 from models.vgg import VGG_ATT
-from models.vit import ViTClassifier
+from models.vit import ViTClassifier, DeiTClassifier, DeiTClassifierV2
 from models.swin import SwinClassifier
 import torch.nn as nn
 torch.backends.cudnn.benchmark = True  # Enable cuDNN auto-tuner
@@ -67,6 +67,7 @@ if __name__ == "__main__":
     # model = VGG_ATT(num_classes=87).to(device)
     # model = ViTClassifier(num_classes=87).to(device)
     model = SwinClassifier(num_classes=87, in_channels=15).to(device)
+    # model = DeiTClassifier(num_classes=87).to(device)
 
 
     criterion = nn.CrossEntropyLoss()

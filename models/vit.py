@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from torchvision.models.vision_transformer import VisionTransformer
 
+import torch.nn.functional as F
+
 class ViTClassifier(nn.Module):
     def __init__(self, image_size=32, patch_size=8, in_channels=15, num_classes=87, embed_dim=384, depth=12, num_heads=8, mlp_ratio=4.0, dropout=0.0, attention_dropout=0.0):
         """
@@ -80,4 +82,52 @@ class ViTClassifier(nn.Module):
         # 2) Resize your input images before passing them to the model.
 
         return self.vit(x)
+
+
+
+import torch
+import torch.nn as nn
+import timm
+
+class DeiTClassifier(nn.Module):
+    def __init__(self, num_classes=87, in_channels=15, img_size=32):
+        super().__init__()
+        # Create a DeiT model using timm.
+        # We use deit_tiny_patch16_224 as a baseline and override:
+        #   - img_size=32: smaller input
+        #   - in_chans=15: handle 15-channel input
+        #   - num_classes=87
+        self.deit = timm.create_model(
+            'deit_tiny_patch16_224', 
+            pretrained=False,
+            img_size=img_size,
+            in_chans=in_channels,
+            num_classes=num_classes
+        )
+
+    def forward(self, x):
+        # x: (B, 15, 32, 32)
+        # Model outputs (B, 87)
+        return self.deit(x)
+
+class DeiTClassifierV2(nn.Module):
+    def __init__(self, num_classes=87, in_channels=15, img_size=32):
+        super().__init__()
+        # Even though we're given img_size=32, we'll ultimately resize inputs to 224x224.
+        # Set img_size=224 in the model since the DeiT model expects that by default.
+        self.deit = timm.create_model(
+            'deit_tiny_patch16_224', 
+            pretrained=False,
+            img_size=128,          # Override to 224, since we will resize inputs
+            in_chans=in_channels,
+            num_classes=num_classes
+        )
+
+    def forward(self, x):
+        # x: (B, 15, 32, 32)
+        # Resize x to (224, 224)
+        x = F.interpolate(x, size=(128, 128), mode='bilinear', align_corners=False)
+        
+        # Now x is (B, 15, 224, 224), suitable for DeiT
+        return self.deit(x)
 
